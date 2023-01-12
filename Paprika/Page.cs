@@ -380,70 +380,88 @@ public readonly unsafe struct Page
 
 namespace test
 {
-            
     [StructLayout(LayoutKind.Explicit, Size = Size, Pack = 1)]
     public struct PageHeader
     {
-        public const int Size = 8;
-        
-        public long TxId;
+        public const int Size = sizeof(long);
+
+        [FieldOffset(0)] public long TxId;
     }
-    
-    [StructLayout(LayoutKind.Explicit, Size = Page.Size, Pack = 1)]
-    public struct Page
+
+    public unsafe readonly struct Page
     {
+        private readonly byte* _ptr;
+
         public const int Size = 4096;
         public const int PageAddressSize = sizeof(int);
         public const int InPageAddressSize = sizeof(short);
         public const int NibbleValues = 16;
 
-        [FieldOffset(0)]
-        public PageHeader Header;
+        public Page(byte* ptr) => _ptr = ptr;
+        public ref PageHeader Header => ref AsRef<PageHeader>(_ptr);
     }
 
-    [StructLayout(LayoutKind.Explicit, Size = Page.Size, Pack = 1)]
-    public struct MetadataPage
+    public unsafe readonly struct MetadataPage
     {
-        [FieldOffset(0)]
-        public PageHeader Header;
-        
-        [FieldOffset(PageHeader.Size)]
-        public int Root;
+        [StructLayout(LayoutKind.Explicit, Size = Page.Size - PageHeader.Size, Pack = 1)]
+        public struct Payload
+        {
+            [FieldOffset(0)] public long Root;
+        }
+
+        private readonly byte* _ptr;
+        public MetadataPage(byte* ptr) => _ptr = ptr;
+
+        public ref PageHeader Header => ref AsRef<PageHeader>(_ptr);
+        public ref Payload Data => ref AsRef<Payload>(_ptr + PageHeader.Size);
     }
-  
-    [StructLayout(LayoutKind.Explicit, Size = Page.Size, Pack = 1)]
+
     public unsafe struct JumpPage
     {
         public const int FanOut = Page.NibbleValues * Page.NibbleValues;
         public const int JumpTableSize = FanOut * Page.PageAddressSize;
-        
-        [FieldOffset(0)]
-        public PageHeader Header;
-        
-        [FieldOffset(PageHeader.Size)]
-        public fixed int Jumps[FanOut];
 
-        [FieldOffset(PageHeader.Size + JumpTableSize)]
-        public fixed byte Additional[Page.Size - PageHeader.Size - JumpTableSize];
+        [StructLayout(LayoutKind.Explicit, Size = Page.Size - PageHeader.Size, Pack = 1)]
+        public struct Payload
+        {
+            [FieldOffset(0)] public fixed int Jumps[FanOut];
+
+            [FieldOffset(0)] public fixed byte Additional[Page.Size - PageHeader.Size - JumpTableSize];
+        }
+
+        private readonly byte* _ptr;
+        public JumpPage(byte* ptr) => _ptr = ptr;
+        public ref PageHeader Header => ref AsRef<PageHeader>(_ptr);
+        public ref Payload Data => ref AsRef<Payload>(_ptr + PageHeader.Size);
     }
-    
+
     [StructLayout(LayoutKind.Explicit, Size = Page.Size, Pack = 1)]
     public unsafe struct ValuePage
     {
         public const int NextSize = Page.PageAddressSize;
         public const int BucketsCount = 16;
         public const int BucketsTableSize = Page.InPageAddressSize * BucketsCount;
-        
-        [FieldOffset(0)]
-        public PageHeader Header;
+        public const int PageSizeBytes = 2;
 
-        [FieldOffset(PageHeader.Size)]
-        public int Next;
-        
-        [FieldOffset(PageHeader.Size + NextSize)]
-        public fixed ushort Buckets[BucketsCount];
+        private const int PayloadSize = Page.Size - PageHeader.Size;
 
-        [FieldOffset(PageHeader.Size + NextSize + BucketsTableSize)]
-        public fixed byte Data[Page.Size - PageHeader.Size - NextSize - BucketsTableSize];
+        [StructLayout(LayoutKind.Explicit, Size = PayloadSize, Pack = 1)]
+        public struct Payload
+        {
+            [FieldOffset(0)] public int Next;
+
+            [FieldOffset(NextSize)] public ushort MemoryUsed;
+
+            [FieldOffset(NextSize + PageSizeBytes)]
+            public fixed ushort Buckets[BucketsCount];
+
+            [FieldOffset(NextSize + PageSizeBytes + BucketsTableSize)]
+            public fixed byte Data[PayloadSize - NextSize - PageSizeBytes - BucketsTableSize];
+        }
+
+        private readonly byte* _ptr;
+        public ValuePage(byte* ptr) => _ptr = ptr;
+        public ref PageHeader Header => ref AsRef<PageHeader>(_ptr);
+        public ref Payload Data => ref AsRef<Payload>(_ptr + PageHeader.Size);
     }
 }
