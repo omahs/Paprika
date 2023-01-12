@@ -1,5 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Paprika.test;
 
 namespace Paprika.Db;
 
@@ -24,16 +25,17 @@ public abstract unsafe class PagedDb : IDb, IDisposable
     private const int HistoryDepth = 2;
 
     private readonly int _maxPage;
-    private readonly MetadataPage*[] _metadata;
+    private readonly Page<Metadata>*[] _metadata;
 
     private long _currentRoot;
 
-    [StructLayout(LayoutKind.Explicit, Size = Page.PageSize, Pack = 1)]
-    private struct MetadataPage
+    [StructLayout(LayoutKind.Explicit, Size = Size, Pack = 1)]
+    private struct Metadata
     {
+        private const int Size = Page<Metadata>.ContentSize;
+        
         [FieldOffset(0)] public int NextFreePage;
         [FieldOffset(4)] public int Root;
-        [FieldOffset(8)] public long TxId;
 
         /// <summary>
         /// Pops the next free page.
@@ -58,17 +60,17 @@ public abstract unsafe class PagedDb : IDb, IDisposable
     protected PagedDb(ulong size)
     {
         _maxPage = (int)(size / Page.PageSize);
-        _metadata = new MetadataPage*[HistoryDepth];
+        _metadata = new Page<Metadata>*[HistoryDepth];
     }
 
     protected void RootInit()
     {
         for (var i = 0; i < HistoryDepth; i++)
         {
-            _metadata[i] = GetAt(i).As<MetadataPage>();
+            _metadata[i] = GetAt(i).As<Metadata>();
         }
 
-        if (_metadata[0]->NextFreePage < HistoryDepth)
+        if (_metadata[0]->Content->NextFreePage < HistoryDepth)
         {
             // the 0th page will have the properly number set to first free page
             _metadata[0]->NextFreePage = HistoryDepth;
@@ -86,10 +88,10 @@ public abstract unsafe class PagedDb : IDb, IDisposable
 
     protected abstract void* Ptr { get; }
 
-    public double TotalUsedPages => (double)CurrentMeta->NextFreePage / _maxPage;
+    public double TotalUsedPages => (double)CurrentMeta.Content. NextFreePage / _maxPage;
 
-    private MetadataPage* CurrentMeta => _metadata[_currentRoot % HistoryDepth];
-    private MetadataPage* NextMeta => _metadata[(_currentRoot + 1) % HistoryDepth];
+    private Page<Metadata> CurrentMeta => _metadata[_currentRoot % HistoryDepth];
+    private Page<Metadata> NextMeta => _metadata[(_currentRoot + 1) % HistoryDepth];
 
     private void MoveRootNext() => _currentRoot++;
 
@@ -117,7 +119,7 @@ public abstract unsafe class PagedDb : IDb, IDisposable
     class Transaction : ITransaction, IInternalTransaction
     {
         private readonly PagedDb _db;
-        private readonly MetadataPage* _meta;
+        private readonly Metadata* _meta;
         private Page _root;
 
         public Transaction(PagedDb db)

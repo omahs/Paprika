@@ -377,3 +377,73 @@ public readonly unsafe struct Page
         private static int GetKeyIndex(in NibblePath key) => (key.GetAt(0) << 2) | (key.GetAt(1) >> 2);
     }
 }
+
+namespace test
+{
+            
+    [StructLayout(LayoutKind.Explicit, Size = Size, Pack = 1)]
+    public struct PageHeader
+    {
+        public const int Size = 8;
+        
+        public long TxId;
+    }
+    
+    [StructLayout(LayoutKind.Explicit, Size = Page.Size, Pack = 1)]
+    public struct Page
+    {
+        public const int Size = 4096;
+        public const int PageAddressSize = sizeof(int);
+        public const int InPageAddressSize = sizeof(short);
+        public const int NibbleValues = 16;
+
+        [FieldOffset(0)]
+        public PageHeader Header;
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size = Page.Size, Pack = 1)]
+    public struct MetadataPage
+    {
+        [FieldOffset(0)]
+        public PageHeader Header;
+        
+        [FieldOffset(PageHeader.Size)]
+        public int Root;
+    }
+  
+    [StructLayout(LayoutKind.Explicit, Size = Page.Size, Pack = 1)]
+    public unsafe struct JumpPage
+    {
+        public const int FanOut = Page.NibbleValues * Page.NibbleValues;
+        public const int JumpTableSize = FanOut * Page.PageAddressSize;
+        
+        [FieldOffset(0)]
+        public PageHeader Header;
+        
+        [FieldOffset(PageHeader.Size)]
+        public fixed int Jumps[FanOut];
+
+        [FieldOffset(PageHeader.Size + JumpTableSize)]
+        public fixed byte Additional[Page.Size - PageHeader.Size - JumpTableSize];
+    }
+    
+    [StructLayout(LayoutKind.Explicit, Size = Page.Size, Pack = 1)]
+    public unsafe struct ValuePage
+    {
+        public const int NextSize = Page.PageAddressSize;
+        public const int BucketsCount = 16;
+        public const int BucketsTableSize = Page.InPageAddressSize * BucketsCount;
+        
+        [FieldOffset(0)]
+        public PageHeader Header;
+
+        [FieldOffset(PageHeader.Size)]
+        public int Next;
+        
+        [FieldOffset(PageHeader.Size + NextSize)]
+        public fixed ushort Buckets[BucketsCount];
+
+        [FieldOffset(PageHeader.Size + NextSize + BucketsTableSize)]
+        public fixed byte Data[Page.Size - PageHeader.Size - NextSize - BucketsTableSize];
+    }
+}

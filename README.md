@@ -26,6 +26,39 @@ Some design principles of Paprika:
 1. use `NibblePath` without decoding it to bytes, which allows easy slicing and fast comparisons. It's also compact
 1. use alloc free RLP/Keccak computations
 
+### Page design
+
+A page is 4kb big. It has an `int` (int32 bytes) address.
+
+There are the following page types:
+
+1. `metadata` - used for root metadata, consists of:
+    1. `tx_id` - the id of the write transaction committing the metadata
+    1. `free page list`
+1. `jump page` - used to consume `N` (N=2) nibbles from the path
+    1. `tx_id` - 8 bytes
+    1. `NibbleCount * NibbleCount * sizeof(PageAddress)` = `16 * 16 * 4` = `1024` bytes
+    1. `Checksum` - `(TopNodeCount + Additional ) * KeccakSize` = `1 + (16 + 2) * 32` = `1 + 18*32` = `577`
+        1. `NeededPageCount * NodeCount` = `33 * (256 + 16) / 4096` = ~3 pages which are stored in 3 addresses
+        1. each node will have either Keccak or RLP that takes 33 bytes
+        1. storing it requires some pages and for Keccak
+        1. it will be ~3 pages to get the Keccaks stored for `256 + 16` nodes
+        1. but it can be stored partially in this jump page and it would take only 2 more pages
+        1. then, having the top 16 nodes stored in-situ + 2 first of children gives enough of space
+1. `checksum page` - Merkle (or Verkle in the future)
+    1. `tx_id` - 8 bytes
+    1. `bitmap keccak_or_rlp` - 128 bits = 16 bytes
+    1. `checksums` - 4072 addressable = gives place for 127 values
+1. `value page` - the M level page (3, when counting from 0 which gives `256 * 256 *256` fan out)
+    1. `tx_id` - 8 bytes
+    1. `free` - 2 bytes (how much the memory is free at the page)
+    1. `next` - 4 bytes (the next value page, shall not be needed at all with this big fan out!)
+    1. `buckets` = `NibbleCount * AddressInPageSize` = `16 * 2` = `32` bytes
+    1. `entry`
+        1. `key` - `KeySize - M * NibbleConsumed` = `32 - 3 * 2` = `26` bytes
+        1. `jump_to_next` - `2 bytes`
+        1. `value` - var_int prefix + value
+
 ## Benchmarks
 
 After the redesign to be page oriented, the benchmarks use bigger numbers
