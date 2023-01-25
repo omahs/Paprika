@@ -3,6 +3,11 @@
 public interface IInternalTransaction
 {
     /// <summary>
+    /// The current transaction id.
+    /// </summary>
+    long TxId { get; }
+    
+    /// <summary>
     /// Gets the page at given address.
     /// </summary>
     Page GetAt(int address);
