@@ -1,5 +1,7 @@
 ﻿using System.Buffers.Binary;
+using FluentAssertions;
 using NUnit.Framework;
+using static Paprika.Tests.Values;
 
 // ReSharper disable HeapView.BoxingAllocation
 
@@ -189,4 +191,30 @@ public class NibblePathTests
         var path = NibblePath.FromKey(stackalloc byte[] { 0x12, 0x34, 0x56 }, odd ? 1 : 0);
         Assert.AreEqual(result, path.GetAt(at));
     }
+
+    [Test]
+    public void Equal()
+    {
+        var k0 = Key0;
+        var k1 = Key0;
+
+        var path0 = NibblePath.FromKey(k0);
+        var path1 = NibblePath.FromKey(k1);
+
+        path0.Equals(path1).Should().BeTrue();
+    }
+
+    [Test]
+    public void NotEqual()
+    {
+        var k0 = Key1a;
+        var k1 = Key1b;
+
+        var path0 = NibblePath.FromKey(k0);
+        var path1 = NibblePath.FromKey(k1);
+
+        path0.Equals(path1).Should().BeFalse();
+    }
+
+
 }
