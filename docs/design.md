@@ -371,7 +371,7 @@ A few remarks:
 
 ### A contract with a huge storage
 
-Let's consider another contract `0xCD`, deployed but wit ha lot of storage cells (thousands to millions)
+Let's consider another contract `0xCD`, deployed but with a lot of storage cells (thousands to millions)
 
 1. address: `0xCD`
 1. balance: `0123`
